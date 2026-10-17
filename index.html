@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>拍攝時間表</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -18,6 +19,7 @@
     --border:#1e1e1e;
     --text:#ddd;
     --dim:#555;
+    --green:#2ed573;
   }
 
   html{font-size:16px}
@@ -52,10 +54,21 @@
   .start-group label{font-size:12px;color:#666}
   #startTime{
     width:80px;text-align:center;font-size:18px;font-weight:900;
-    color:var(--gold);background:#111;border:2px solid var(--gold);
+    color:var(--gold);-webkit-text-fill-color:var(--gold);
+    background:#111;border:2px solid var(--gold);
     padding:5px 6px;border-radius:8px;font-family:inherit;
   }
   #startTime:focus{outline:none}
+
+  input[type="time"]{
+    -webkit-text-fill-color:var(--gold)!important;opacity:1;
+  }
+  input[type="time"]::-webkit-date-and-time-value{
+    color:var(--gold);text-align:center;
+  }
+  input[type="time"]::-webkit-calendar-picker-indicator{
+    filter:invert(.7);opacity:.6;
+  }
 
   .topbar-fields{
     display:grid;
@@ -86,10 +99,21 @@
     max-width:800px;margin:0 auto;padding:8px 0;
   }
 
+  /* ── LOCATION DIVIDER ── */
+  .loc-divider{
+    padding:10px 16px 4px;
+    font-size:13px;font-weight:700;
+    color:var(--gold);
+    background:rgba(245,197,24,.04);
+    border-left:3px solid var(--gold);
+    margin:6px 0 2px;
+  }
+
   /* ── ROW WRAPPER ── */
   .row-wrap{
     position:relative;overflow:hidden;
     border-bottom:1px solid var(--border);
+    transition:opacity .35s ease;
   }
 
   .swipe-bg{
@@ -97,9 +121,12 @@
     background:#e53935;
     display:flex;align-items:center;padding-left:20px;
     color:#fff;font-weight:700;font-size:14px;gap:6px;
-    pointer-events:none;opacity:0;transition:opacity .15s;
+    pointer-events:none;opacity:0;transition:opacity .15s,background .2s;
   }
   .row-wrap.swiping .swipe-bg{opacity:1}
+  .row-wrap.swipe-go .swipe-bg{
+    background:linear-gradient(135deg,var(--green),#00b894);
+  }
 
   /* ── ROW ── */
   .row{
@@ -115,6 +142,51 @@
   }
   .row.snapping{transition:transform .25s ease}
   .row.dragging{transition:none}
+
+  /* ── GREEN GLOW OVERLAY ── */
+  .row-wrap .glow-overlay{
+    position:absolute;inset:0;z-index:10;
+    pointer-events:none;opacity:0;
+    background:linear-gradient(135deg,rgba(46,213,115,.1),rgba(0,184,148,.06));
+    border:2px solid var(--green);
+    border-radius:2px;
+    box-shadow:
+      0 0 15px rgba(46,213,115,.35),
+      0 0 40px rgba(46,213,115,.12),
+      inset 0 0 20px rgba(46,213,115,.05);
+  }
+  .row-wrap.glow-green .glow-overlay{
+    animation:rowGlowBreath .8s ease forwards;
+  }
+  @keyframes rowGlowBreath{
+    0%{
+      opacity:0;
+      box-shadow:0 0 0 rgba(46,213,115,0),0 0 0 rgba(46,213,115,0);
+    }
+    35%{
+      opacity:1;
+      box-shadow:
+        0 0 25px rgba(46,213,115,.55),
+        0 0 60px rgba(46,213,115,.2),
+        inset 0 0 30px rgba(46,213,115,.08);
+    }
+    100%{
+      opacity:0;
+      box-shadow:0 0 0 rgba(46,213,115,0),0 0 0 rgba(46,213,115,0);
+    }
+  }
+
+  /* ── Fade-out after glow ── */
+  .row-wrap.fade-out{
+    opacity:0;
+    transition:opacity .3s ease;
+  }
+
+  /* ── Collapse after fade ── */
+  .row-wrap.deleting{
+    max-height:0!important;opacity:0;overflow:hidden;border-bottom:none;
+    transition:max-height .3s ease,opacity .05s;
+  }
 
   .cell-dur{
     grid-row:1/3;grid-column:1;
@@ -164,7 +236,7 @@
 
   .desk-del{
     display:none;position:absolute;right:6px;top:50%;transform:translateY(-50%);
-    z-index:5;background:none;border:none;color:#333;
+    z-index:15;background:none;border:none;color:#333;
     font-size:16px;cursor:pointer;width:28px;height:28px;border-radius:6px;
     align-items:center;justify-content:center;transition:all .15s;
   }
@@ -181,6 +253,42 @@
     font-family:inherit;cursor:pointer;transition:all .2s;
   }
   .add-btn:hover,.add-btn:active{border-color:var(--gold);color:var(--gold)}
+
+  /* ── REMARK SECTION ── */
+  .remark-section{
+    max-width:800px;margin:14px auto 0;padding:0 10px;
+  }
+  .remark-title{
+    font-size:13px;color:#555;font-weight:600;
+    margin-bottom:6px;padding-left:4px;
+  }
+  .remark-area{
+    width:100%;min-height:80px;
+    background:#1a1a1a;border:1px solid #2a2a2a;
+    color:var(--text);padding:10px 12px;border-radius:12px;
+    font-size:14px;font-family:inherit;resize:vertical;
+  }
+  .remark-area:focus{outline:none;border-color:var(--gold)}
+  .remark-area::placeholder{color:#3a3a3a}
+
+  /* ── UNDO TOAST ── */
+  .undo-toast{
+    position:fixed;bottom:70px;left:50%;
+    transform:translateX(-50%) translateY(80px);
+    background:rgba(28,28,30,.96);
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    border:1px solid #333;color:#fff;
+    padding:10px 16px;border-radius:12px;font-size:14px;
+    display:flex;align-items:center;gap:12px;
+    z-index:300;transition:transform .3s ease;
+    box-shadow:0 4px 20px rgba(0,0,0,.4);
+  }
+  .undo-toast.show{transform:translateX(-50%) translateY(-10px)}
+  .undo-toast button{
+    background:var(--gold);color:#000;border:none;
+    padding:5px 14px;border-radius:8px;font-weight:700;
+    cursor:pointer;font-family:inherit;font-size:13px;white-space:nowrap;
+  }
 
   /* ── BOTTOM BAR ── */
   .bottombar{
@@ -205,7 +313,7 @@
   .b-btn.pri{background:var(--gold);color:#000;border-color:var(--gold);font-weight:700}
   .b-btn.pri:hover{background:#ffd740}
 
-  /* ── EXPORT MENU (Action Sheet) ── */
+  /* ── EXPORT MENU ── */
   .menu-overlay{
     position:fixed;inset:0;z-index:998;
     background:rgba(0,0,0,.5);
@@ -258,7 +366,6 @@
   }
   .menu-cancel:hover,.menu-cancel:active{background:#3a3a3c}
 
-  /* Desktop: popup instead of action sheet */
   @media(min-width:700px){
     .export-menu{
       position:fixed;
@@ -320,17 +427,6 @@
     .swipe-bg{display:none!important}
   }
 
-  /* ── Delete animation ── */
-  .row-wrap.deleting{
-    max-height:0!important;opacity:0;overflow:hidden;border-bottom:none;
-    transition:max-height .3s ease,opacity .2s ease;
-  }
-
-  /* ── CAPTURE AREA (hidden clone styling) ── */
-  #captureArea{
-    max-width:800px;margin:0 auto;
-  }
-
   /* ── PRINT ── */
   @media print{
     body{background:#fff;color:#111;padding-bottom:0}
@@ -338,14 +434,17 @@
     .topbar-title{color:#111}
     .field-input{background:#fff;border-color:#ccc;color:#111}
     .field-label{color:#888}
-    #startTime{color:#111;border-color:#111;background:#fff}
+    #startTime{color:#111;-webkit-text-fill-color:#111;border-color:#111;background:#fff}
     .row-wrap{border-bottom:1px solid #ddd}
-    .row{background:#fff}
+    .row{background:#fff;box-shadow:none!important}
     .dur-input{color:#111;background:#f5f5f5;border-color:#ddd}
     .t-from,.t-to{color:#111}
     .loc-input:not(:placeholder-shown){color:#8a6d00}
     .loc-input,.rem-input{color:#111}
-    .desk-del,.swipe-bg,.add-area,.bottombar,.hint,.menu-overlay,.export-menu,.toast{display:none!important}
+    .loc-divider{color:#8a6d00;background:rgba(245,197,24,.08);border-left-color:#8a6d00}
+    .remark-section{margin-top:16px}
+    .remark-area{background:#f5f5f5;border-color:#ccc;color:#111}
+    .desk-del,.swipe-bg,.add-area,.bottombar,.hint,.menu-overlay,.export-menu,.toast,.undo-toast,.glow-overlay{display:none!important}
     .start-group label{color:#666}
   }
 </style>
@@ -431,7 +530,19 @@
 </div>
 
 <div class="hint">
-  📱 向右滑刪除 &nbsp;｜&nbsp; <kbd>Tab</kbd> 下一格 &nbsp; <kbd>Enter</kbd> 新增行
+  📱 向右滑刪除 &nbsp;｜&nbsp; <kbd>Ctrl</kbd>+<kbd>Z</kbd> 復原 &nbsp;｜&nbsp; <kbd>Tab</kbd> 下一格 &nbsp; <kbd>Enter</kbd> 新增行
+</div>
+
+<!-- REMARK -->
+<div class="remark-section">
+  <div class="remark-title">📝 備註</div>
+  <textarea class="remark-area" id="remarkArea" placeholder="輸入備註⋯" oninput="autoSave()"></textarea>
+</div>
+
+<!-- UNDO TOAST -->
+<div class="undo-toast" id="undoToast">
+  <span>已刪除項目</span>
+  <button onclick="undoDelete()">復原</button>
 </div>
 
 <!-- BOTTOM BAR -->
@@ -448,7 +559,7 @@
 const schedule = document.getElementById('schedule');
 const startInput = document.getElementById('startTime');
 
-// ── Helpers ──
+/* ═══ HELPERS ═══ */
 const m2t = m => {
   const h = Math.floor(m/60)%24, mn = m%60;
   return `${String(h).padStart(2,'0')}:${String(mn).padStart(2,'0')}`;
@@ -463,7 +574,52 @@ const fileName = () => {
   return `時間表_${p||'draft'}${d?'_'+d:''}`;
 };
 
-// ── Recalc ──
+/* ═══ UNDO STACK ═══ */
+let deleteStack = [];
+let undoTimer = null;
+
+function saveForUndo(wrap){
+  const r = wrap.querySelector('.row');
+  const allWraps = [...schedule.querySelectorAll('.row-wrap')];
+  deleteStack.push({
+    data:{
+      d: r.querySelector('.dur-input').value,
+      l: r.querySelector('.loc-input').value,
+      r: r.querySelector('.rem-input').value
+    },
+    pos: allWraps.indexOf(wrap)
+  });
+}
+
+function showUndoToast(){
+  const t = document.getElementById('undoToast');
+  t.classList.add('show');
+  clearTimeout(undoTimer);
+  undoTimer = setTimeout(()=>t.classList.remove('show'), 5000);
+}
+
+function undoDelete(){
+  if(!deleteStack.length) return;
+  const {data, pos} = deleteStack.pop();
+  const wrap = createRowWrap(data.d, data.l, data.r);
+  const currentWraps = [...schedule.querySelectorAll('.row-wrap')];
+  if(pos < currentWraps.length){
+    schedule.insertBefore(wrap, currentWraps[pos]);
+  } else {
+    schedule.appendChild(wrap);
+  }
+  recalc(); updateLocationLabels(); autoSave();
+  document.getElementById('undoToast').classList.remove('show');
+  clearTimeout(undoTimer);
+}
+
+document.addEventListener('keydown', e=>{
+  if((e.ctrlKey||e.metaKey) && e.key==='z'){
+    e.preventDefault(); undoDelete();
+  }
+});
+
+/* ═══ RECALC ═══ */
 function recalc(){
   let cur = startMin(), total = 0;
   schedule.querySelectorAll('.row-wrap').forEach(w => {
@@ -478,14 +634,40 @@ function recalc(){
   document.getElementById('sEnd').textContent = m2t(startMin()+total);
   document.getElementById('sCount').textContent = schedule.querySelectorAll('.row-wrap').length;
 }
-startInput.addEventListener('input', recalc);
+startInput.addEventListener('input', ()=>{ recalc(); autoSave(); });
 
-// ── Add Row ──
-function addRow(dur='', loc='', rem=''){
+/* ═══ LOCATION LABELS ═══ */
+function updateLocationLabels(){
+  schedule.querySelectorAll('.loc-divider').forEach(el=>el.remove());
+  const rows = [...schedule.querySelectorAll('.row-wrap')];
+  const seen = [];
+  rows.forEach(w=>{
+    const loc = w.querySelector('.loc-input').value.trim();
+    if(loc && !seen.includes(loc)) seen.push(loc);
+  });
+  if(seen.length < 2) return;
+  const cn = ['一','二','三','四','五','六','七','八','九','十'];
+  let lastLoc = null;
+  rows.forEach(w=>{
+    const loc = w.querySelector('.loc-input').value.trim();
+    if(loc && loc !== lastLoc){
+      const idx = seen.indexOf(loc);
+      const div = document.createElement('div');
+      div.className = 'loc-divider';
+      div.textContent = `📍 第${cn[idx]||(idx+1)}地點 — ${loc}`;
+      schedule.insertBefore(div, w);
+      lastLoc = loc;
+    }
+  });
+}
+
+/* ═══ CREATE ROW ═══ */
+function createRowWrap(dur, loc, rem){
   const wrap = document.createElement('div');
   wrap.className = 'row-wrap';
   wrap.innerHTML = `
     <div class="swipe-bg">🗑 刪除</div>
+    <div class="glow-overlay"></div>
     <div class="row">
       <div class="cell-dur">
         <div class="dur-wrap">
@@ -502,27 +684,59 @@ function addRow(dur='', loc='', rem=''){
         <input class="loc-input" placeholder="📍 地點" value="${loc}">
         <input class="rem-input" placeholder="✏️ 備註" value="${rem}">
       </div>
-      <button class="desk-del" onclick="deleteRow(this.closest('.row-wrap'))">✕</button>
+      <button class="desk-del" onclick="glowThenDelete(this.closest('.row-wrap'))">✕</button>
     </div>
   `;
-  const row = wrap.querySelector('.row');
-  row.querySelector('.dur-input').addEventListener('input', recalc);
+  wrap.querySelector('.dur-input').addEventListener('input', ()=>{ recalc(); autoSave(); });
+  wrap.querySelector('.loc-input').addEventListener('input', ()=>{ updateLocationLabels(); autoSave(); });
+  wrap.querySelector('.rem-input').addEventListener('input', autoSave);
   wrap.querySelectorAll('input').forEach(inp=>{
     inp.addEventListener('keydown', e=>{
-      if(e.key==='Enter'){e.preventDefault();addRow();focusLast()}
+      if(e.key==='Enter'){e.preventDefault();addRow();focusLast();}
     });
   });
   setupSwipe(wrap);
-  schedule.appendChild(wrap);
-  recalc();
   return wrap;
 }
 
-function deleteRow(wrap){
-  const h = wrap.offsetHeight;
-  wrap.style.maxHeight = h+'px';
-  requestAnimationFrame(()=>wrap.classList.add('deleting'));
-  setTimeout(()=>{wrap.remove();recalc()},300);
+/* ═══ ADD ROW ═══ */
+function addRow(dur='', loc='', rem=''){
+  const wrap = createRowWrap(dur, loc, rem);
+  schedule.appendChild(wrap);
+  recalc(); updateLocationLabels(); autoSave();
+  return wrap;
+}
+
+/* ═══════════════════════════════════════════
+   DELETE SEQUENCE:
+   1. Green glow breathes in then out (0.8s)
+   2. Whole row fades to transparent (0.3s)
+   3. Height collapses to 0 (0.3s)
+   4. Element removed
+   ═══════════════════════════════════════════ */
+function glowThenDelete(wrap){
+  if(wrap._deleting) return;
+  wrap._deleting = true;
+  saveForUndo(wrap);
+
+  // Step 1: green glow breath (0.8s animation: up then back down)
+  wrap.classList.add('glow-green');
+
+  // Step 2: after glow finishes, fade the whole row out
+  setTimeout(()=>{
+    wrap.classList.add('fade-out');
+
+    // Step 3: after fade, collapse height then remove
+    setTimeout(()=>{
+      const h = wrap.offsetHeight;
+      wrap.style.maxHeight = h + 'px';
+      requestAnimationFrame(()=> wrap.classList.add('deleting'));
+      setTimeout(()=>{
+        wrap.remove();
+        recalc(); updateLocationLabels(); autoSave(); showUndoToast();
+      }, 300);
+    }, 300);
+  }, 800);
 }
 
 function focusLast(){
@@ -530,14 +744,14 @@ function focusLast(){
   if(all.length) all[all.length-1].focus();
 }
 
-// ── Swipe to Delete ──
+/* ═══ SWIPE TO DELETE ═══ */
 function setupSwipe(wrap){
   const row = wrap.querySelector('.row');
   let startX=0, startY=0, dx=0, swiping=false, locked=false;
   const threshold = () => wrap.offsetWidth * 0.35;
 
   row.addEventListener('touchstart', e=>{
-    if(e.target.closest('input')) return;
+    if(e.target.closest('input') || wrap._deleting) return;
     const t = e.touches[0];
     startX = t.clientX; startY = t.clientY;
     dx = 0; swiping = false; locked = false;
@@ -546,7 +760,7 @@ function setupSwipe(wrap){
   }, {passive:true});
 
   row.addEventListener('touchmove', e=>{
-    if(locked) return;
+    if(locked || wrap._deleting) return;
     const t = e.touches[0];
     const moveX = t.clientX - startX;
     const moveY = t.clientY - startY;
@@ -558,23 +772,81 @@ function setupSwipe(wrap){
     }
     dx = Math.max(0, moveX);
     row.style.transform = `translateX(${dx}px)`;
+    if(dx > threshold()){
+      wrap.classList.add('swipe-go');
+    } else {
+      wrap.classList.remove('swipe-go');
+    }
   }, {passive:true});
 
   row.addEventListener('touchend', ()=>{
     row.classList.remove('dragging');
     row.classList.add('snapping');
     if(swiping && dx > threshold()){
-      row.style.transform = `translateX(100%)`;
-      setTimeout(()=>deleteRow(wrap),200);
+      // Swipe delete: also glow → fade → collapse (same sequence)
+      glowThenDelete(wrap);
     } else {
       row.style.transform = 'translateX(0)';
+      wrap.classList.remove('swipe-go');
       setTimeout(()=>wrap.classList.remove('swiping'),250);
     }
     swiping=false;
   });
 }
 
-// ── Menu ──
+/* ═══ AUTO-SAVE / AUTO-LOAD ═══ */
+const STORAGE_KEY = 'shooting_schedule_v1';
+let saveDebounce;
+
+function autoSave(){
+  clearTimeout(saveDebounce);
+  saveDebounce = setTimeout(()=>{
+    const rows=[];
+    schedule.querySelectorAll('.row-wrap').forEach(w=>{
+      const r=w.querySelector('.row');
+      rows.push({
+        d:r.querySelector('.dur-input').value,
+        l:r.querySelector('.loc-input').value,
+        r:r.querySelector('.rem-input').value
+      });
+    });
+    const data={
+      p:document.getElementById('project').value,
+      c:document.getElementById('client').value,
+      dt:document.getElementById('shootDate').value,
+      st:startInput.value,
+      remark:document.getElementById('remarkArea').value,
+      rows
+    };
+    try{localStorage.setItem(STORAGE_KEY,JSON.stringify(data));}catch(e){}
+  },300);
+}
+
+function autoLoad(){
+  try{
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if(!saved) return false;
+    const d = JSON.parse(saved);
+    if(!d.rows || !d.rows.length) return false;
+    document.getElementById('project').value = d.p||'';
+    document.getElementById('client').value = d.c||'';
+    document.getElementById('shootDate').value = d.dt||'';
+    startInput.value = d.st||'14:00';
+    document.getElementById('remarkArea').value = d.remark||'';
+    schedule.innerHTML='';
+    d.rows.forEach(r=>{
+      schedule.appendChild(createRowWrap(r.d,r.l,r.r));
+    });
+    recalc(); updateLocationLabels();
+    return true;
+  }catch(e){return false;}
+}
+
+['project','client','shootDate'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', autoSave);
+});
+
+/* ═══ MENU ═══ */
 function openMenu(){
   document.getElementById('menuOverlay').classList.add('show');
   document.getElementById('exportMenu').classList.add('show');
@@ -584,7 +856,7 @@ function closeMenu(){
   document.getElementById('exportMenu').classList.remove('show');
 }
 
-// ── Toast ──
+/* ═══ TOAST ═══ */
 function showToast(text){
   const t=document.getElementById('toast');
   document.getElementById('toastSpinner').style.display='block';
@@ -600,29 +872,23 @@ function toastSuccess(text){
 }
 function hideToast(){document.getElementById('toast').classList.remove('show')}
 
-// ── Build capture clone ──
+/* ═══ BUILD CAPTURE ═══ */
 function buildCapture(){
-  // Create a standalone div that represents the schedule for capture
   const container = document.createElement('div');
-  container.style.cssText = `
-    background:#0f0f0f;color:#ddd;padding:24px;width:800px;
-    font-family:'Noto Sans TC',-apple-system,BlinkMacSystemFont,sans-serif;
-  `;
+  container.style.cssText = `background:#0f0f0f;color:#ddd;padding:24px;width:800px;font-family:'Noto Sans TC',-apple-system,BlinkMacSystemFont,sans-serif;`;
 
-  // Header
   const projectVal = document.getElementById('project').value || '未命名項目';
   const clientVal = document.getElementById('client').value;
   const dateVal = document.getElementById('shootDate').value;
   const startVal = startInput.value || '14:00';
+  const remarkVal = document.getElementById('remarkArea').value;
 
   let headerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:14px;border-bottom:2px solid #f5c518;">
       <div>
         <div style="font-size:22px;font-weight:900;color:#f5c518;margin-bottom:4px;">🎬 ${projectVal}</div>
         <div style="font-size:13px;color:#888;">
-          ${clientVal?'客戶：'+clientVal:''}
-          ${clientVal&&dateVal?' &nbsp;│&nbsp; ':''}
-          ${dateVal?'日期：'+dateVal:''}
+          ${clientVal?'客戶：'+clientVal:''}${clientVal&&dateVal?' &nbsp;│&nbsp; ':''}${dateVal?'日期：'+dateVal:''}
         </div>
       </div>
       <div style="text-align:right;">
@@ -632,38 +898,53 @@ function buildCapture(){
     </div>
   `;
 
-  // Rows
-  let rowsHTML = '';
-  schedule.querySelectorAll('.row-wrap').forEach(w => {
+  const allRows = [];
+  schedule.querySelectorAll('.row-wrap').forEach(w=>{
     const r = w.querySelector('.row');
-    const dur = r.querySelector('.dur-input').value || '0';
-    const from = r.querySelector('.t-from').textContent;
-    const to = r.querySelector('.t-to').textContent;
-    const loc = r.querySelector('.loc-input').value;
-    const rem = r.querySelector('.rem-input').value;
+    allRows.push({
+      dur: r.querySelector('.dur-input').value||'0',
+      from: r.querySelector('.t-from').textContent,
+      to: r.querySelector('.t-to').textContent,
+      loc: r.querySelector('.loc-input').value,
+      rem: r.querySelector('.rem-input').value
+    });
+  });
 
-    rowsHTML += `
+  const seen=[];
+  allRows.forEach(r=>{if(r.loc.trim()&&!seen.includes(r.loc.trim()))seen.push(r.loc.trim());});
+  const cn=['一','二','三','四','五','六','七','八','九','十'];
+
+  let rowsHTML='';
+  let lastLoc=null;
+  allRows.forEach(r=>{
+    const loc=r.loc.trim();
+    if(seen.length>=2 && loc && loc!==lastLoc){
+      const idx=seen.indexOf(loc);
+      rowsHTML+=`<div style="padding:10px 0 4px;font-size:13px;font-weight:700;color:#f5c518;border-left:3px solid #f5c518;padding-left:12px;margin:6px 0 2px;">📍 第${cn[idx]||(idx+1)}地點 — ${loc}</div>`;
+      lastLoc=loc;
+    }
+    rowsHTML+=`
       <div style="display:grid;grid-template-columns:70px 110px 24px 110px 1fr 1fr;align-items:center;padding:12px 0;border-bottom:1px solid #1e1e1e;">
         <div style="display:flex;align-items:center;justify-content:center;">
           <div style="background:#1a1a1a;border:2px solid #252525;border-radius:10px;padding:8px 4px;text-align:center;width:54px;">
-            <div style="font-size:22px;font-weight:900;color:#f5c518;line-height:1">${dur}</div>
+            <div style="font-size:22px;font-weight:900;color:#f5c518;line-height:1">${r.dur}</div>
             <div style="font-size:8px;color:#444;font-weight:700;letter-spacing:.5px;">MIN</div>
           </div>
         </div>
-        <div style="text-align:center;font-size:16px;font-weight:700;color:#aaa;">${from}</div>
+        <div style="text-align:center;font-size:16px;font-weight:700;color:#aaa;">${r.from}</div>
         <div style="text-align:center;font-size:12px;color:#444;">→</div>
-        <div style="text-align:center;font-size:16px;font-weight:700;color:#aaa;">${to}</div>
-        <div style="padding:0 10px;font-size:15px;${loc?'color:#f5c518;font-weight:600':'color:#333'};">${loc||'—'}</div>
-        <div style="padding:0 10px;font-size:15px;color:#ddd;">${rem||''}</div>
+        <div style="text-align:center;font-size:16px;font-weight:700;color:#aaa;">${r.to}</div>
+        <div style="padding:0 10px;font-size:15px;${r.loc?'color:#f5c518;font-weight:600':'color:#333'};">${r.loc||'—'}</div>
+        <div style="padding:0 10px;font-size:15px;color:#ddd;">${r.rem||''}</div>
       </div>
     `;
   });
 
-  // Footer
-  const totalEl = document.getElementById('sTotal').textContent;
-  const endEl = document.getElementById('sEnd').textContent;
-  const countEl = document.getElementById('sCount').textContent;
-  let footerHTML = `
+  const totalEl=document.getElementById('sTotal').textContent;
+  const endEl=document.getElementById('sEnd').textContent;
+  const countEl=document.getElementById('sCount').textContent;
+
+  let footerHTML=`
     <div style="display:flex;gap:24px;margin-top:16px;padding-top:14px;border-top:2px solid #1e1e1e;">
       <div><span style="font-size:11px;color:#555;">總共 </span><span style="font-size:18px;font-weight:900;color:#f5c518;">${totalEl}</span></div>
       <div><span style="font-size:11px;color:#555;">結束 </span><span style="font-size:18px;font-weight:900;color:#f5c518;">${endEl}</span></div>
@@ -671,106 +952,71 @@ function buildCapture(){
     </div>
   `;
 
-  container.innerHTML = headerHTML + rowsHTML + footerHTML;
+  let remarkHTML='';
+  if(remarkVal.trim()){
+    remarkHTML=`
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid #1e1e1e;">
+        <div style="font-size:12px;color:#555;margin-bottom:6px;font-weight:600;">📝 備註</div>
+        <div style="font-size:14px;color:#ddd;white-space:pre-wrap;line-height:1.6;">${remarkVal.replace(/</g,'&lt;')}</div>
+      </div>
+    `;
+  }
+
+  container.innerHTML = headerHTML + rowsHTML + footerHTML + remarkHTML;
   return container;
 }
 
-// ── Export Image ──
+/* ═══ EXPORT IMAGE ═══ */
 async function exportImage(){
   closeMenu();
   await new Promise(r=>setTimeout(r,350));
   showToast('正在生成圖片⋯');
-
   try{
-    const capture = buildCapture();
+    const capture=buildCapture();
     document.body.appendChild(capture);
-
-    const canvas = await html2canvas(capture, {
-      backgroundColor:'#0f0f0f',
-      scale:2,
-      useCORS:true,
-      logging:false
-    });
-
+    const canvas=await html2canvas(capture,{backgroundColor:'#0f0f0f',scale:2,useCORS:true,logging:false});
     document.body.removeChild(capture);
-
     canvas.toBlob(blob=>{
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName()+'.png';
-      a.click();
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;a.download=fileName()+'.png';a.click();
       URL.revokeObjectURL(url);
       toastSuccess('圖片已儲存 ✓');
     },'image/png');
-
-  }catch(err){
-    console.error(err);
-    hideToast();
-    alert('匯出失敗，請再試一次');
-  }
+  }catch(err){console.error(err);hideToast();}
 }
 
-// ── Export PDF ──
+/* ═══ EXPORT PDF ═══ */
 async function exportPDF(){
   closeMenu();
   await new Promise(r=>setTimeout(r,350));
   showToast('正在生成 PDF⋯');
-
   try{
-    const capture = buildCapture();
+    const capture=buildCapture();
     document.body.appendChild(capture);
-
-    const canvas = await html2canvas(capture, {
-      backgroundColor:'#0f0f0f',
-      scale:2,
-      useCORS:true,
-      logging:false
-    });
-
+    const canvas=await html2canvas(capture,{backgroundColor:'#0f0f0f',scale:2,useCORS:true,logging:false});
     document.body.removeChild(capture);
-
-    const { jsPDF } = window.jspdf;
-    const imgData = canvas.toDataURL('image/png');
-
-    // A4
-    const pdfW = 210;
-    const pdfH = 297;
-    const margin = 10;
-    const contentW = pdfW - margin*2;
-    const contentH = (canvas.height * contentW) / canvas.width;
-
-    const orientation = contentH > pdfH - margin*2 ? 'p' : 'p';
-    const pdf = new jsPDF(orientation, 'mm', 'a4');
-
-    // If content is taller than one page, scale to fit
-    let finalW = contentW;
-    let finalH = contentH;
-    if(finalH > pdfH - margin*2){
-      const scale = (pdfH - margin*2) / finalH;
-      finalW *= scale;
-      finalH *= scale;
+    const{jsPDF}=window.jspdf;
+    const imgData=canvas.toDataURL('image/png');
+    const pdfW=210,pdfH=297,margin=10;
+    const contentW=pdfW-margin*2;
+    let contentH=(canvas.height*contentW)/canvas.width;
+    const pdf=new jsPDF('p','mm','a4');
+    let finalW=contentW,finalH=contentH;
+    if(finalH>pdfH-margin*2){
+      const scale=(pdfH-margin*2)/finalH;
+      finalW*=scale;finalH*=scale;
     }
-
-    const x = (pdfW - finalW)/2;
-    const y = margin;
-
+    const x=(pdfW-finalW)/2,y=margin;
     pdf.setFillColor(15,15,15);
     pdf.rect(0,0,pdfW,pdfH,'F');
-
-    pdf.addImage(imgData,'PNG', x, y, finalW, finalH);
+    pdf.addImage(imgData,'PNG',x,y,finalW,finalH);
     pdf.save(fileName()+'.pdf');
-
     toastSuccess('PDF 已儲存 ✓');
-
-  }catch(err){
-    console.error(err);
-    hideToast();
-    alert('匯出失敗，請再試一次');
-  }
+  }catch(err){console.error(err);hideToast();}
 }
 
-// ── Save / Load JSON ──
+/* ═══ SAVE / LOAD JSON ═══ */
 function saveJSON(){
   closeMenu();
   const rows=[];
@@ -787,6 +1033,7 @@ function saveJSON(){
     c:document.getElementById('client').value,
     dt:document.getElementById('shootDate').value,
     st:startInput.value,
+    remark:document.getElementById('remarkArea').value,
     rows
   };
   const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
@@ -810,8 +1057,12 @@ function loadJSON(){
         document.getElementById('client').value=d.c||'';
         document.getElementById('shootDate').value=d.dt||'';
         startInput.value=d.st||'14:00';
+        document.getElementById('remarkArea').value=d.remark||'';
         schedule.innerHTML='';
-        (d.rows||[]).forEach(r=>addRow(r.d,r.l,r.r));
+        (d.rows||[]).forEach(r=>{
+          schedule.appendChild(createRowWrap(r.d,r.l,r.r));
+        });
+        recalc(); updateLocationLabels(); autoSave();
       }catch{alert('檔案錯誤')}
     };
     reader.readAsText(f);
@@ -819,14 +1070,17 @@ function loadJSON(){
   input.click();
 }
 
-// ── Demo ──
-addRow('180','荔枝角華盛工業中心9樓A','化妝');
-addRow('30','','車程去土瓜灣');
-addRow('60','土瓜灣 鋪頭','拍攝');
-addRow('15','','換衫');
-addRow('30','','車程去港澳碼頭');
-addRow('90','港澳碼頭電車站','拍攝');
+/* ═══ INIT ═══ */
+if(!autoLoad()){
+  [['180','荔枝角華盛工業中心9樓A','化妝'],
+   ['30','','車程去土瓜灣'],
+   ['60','土瓜灣 鋪頭','拍攝'],
+   ['15','','換衫'],
+   ['30','','車程去港澳碼頭'],
+   ['90','港澳碼頭電車站','拍攝']
+  ].forEach(([d,l,r])=> schedule.appendChild(createRowWrap(d,l,r)));
+  recalc(); updateLocationLabels();
+}
 </script>
-
 </body>
 </html>
