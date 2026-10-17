@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>拍攝時間表</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700;900&display=swap');
+
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+
+  :root{
+    --gold:#f5c518;
+    --bg:#0f0f0f;
+    --card:#161616;
+    --border:#1e1e1e;
+    --text:#ddd;
+    --dim:#555;
+  }
+
+  html{font-size:16px}
+  body{
+    font-family:'Noto Sans TC',-apple-system,BlinkMacSystemFont,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    min-height:100dvh;
+    min-height:100vh;
+    overflow-x:hidden;
+    padding-bottom:72px;
+  }
+
+  /* ── TOP BAR ── */
+  .topbar{
+    position:sticky;top:0;z-index:200;
+    background:rgba(15,15,15,.92);
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border-bottom:1px solid var(--border);
+    padding:12px 16px 14px;
+  }
+  .topbar-header{
+    display:flex;align-items:center;justify-content:space-between;
+    margin-bottom:10px;
+  }
+  .topbar-title{
+    font-size:18px;font-weight:900;color:var(--gold);white-space:nowrap;
+  }
+  .start-group{
+    display:flex;align-items:center;gap:6px;
+  }
+  .start-group label{font-size:12px;color:#666}
+  #startTime{
+    width:80px;text-align:center;font-size:18px;font-weight:900;
+    color:var(--gold);background:#111;border:2px solid var(--gold);
+    padding:5px 6px;border-radius:8px;font-family:inherit;
+  }
+  #startTime:focus{outline:none}
+
+  .topbar-fields{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+  .topbar-fields .field-full{grid-column:1/-1}
+  .field-label{
+    font-size:10px;color:#555;margin-bottom:3px;font-weight:600;
+    letter-spacing:.5px;text-transform:uppercase;
+  }
+  .field-input{
+    width:100%;
+    background:#1a1a1a;border:1px solid #2a2a2a;color:#fff;
+    padding:8px 10px;border-radius:8px;font-size:14px;font-family:inherit;
+  }
+  .field-input:focus{outline:none;border-color:var(--gold)}
+  .field-input::placeholder{color:#3a3a3a}
+
+  @media(min-width:700px){
+    .topbar-header{margin-bottom:8px}
+    .topbar-fields{grid-template-columns:1fr 1fr 150px}
+    .topbar-fields .field-full{grid-column:auto}
+  }
+
+  /* ── SCHEDULE ── */
+  .schedule{
+    max-width:800px;margin:0 auto;padding:8px 0;
+  }
+
+  /* ── ROW WRAPPER ── */
+  .row-wrap{
+    position:relative;overflow:hidden;
+    border-bottom:1px solid var(--border);
+  }
+
+  .swipe-bg{
+    position:absolute;top:0;left:0;bottom:0;width:100%;
+    background:#e53935;
+    display:flex;align-items:center;padding-left:20px;
+    color:#fff;font-weight:700;font-size:14px;gap:6px;
+    pointer-events:none;opacity:0;transition:opacity .15s;
+  }
+  .row-wrap.swiping .swipe-bg{opacity:1}
+
+  /* ── ROW ── */
+  .row{
+    position:relative;z-index:2;
+    background:var(--bg);
+    display:grid;
+    grid-template-columns:58px 1fr 1fr;
+    grid-template-rows:auto auto;
+    gap:0;
+    transition:transform .25s ease;
+    will-change:transform;
+    touch-action:pan-y;
+  }
+  .row.snapping{transition:transform .25s ease}
+  .row.dragging{transition:none}
+
+  .cell-dur{
+    grid-row:1/3;grid-column:1;
+    display:flex;align-items:center;justify-content:center;
+    padding:8px 4px 8px 10px;
+  }
+  .dur-wrap{position:relative;width:48px}
+  .dur-input{
+    width:100%;background:#1a1a1a;border:2px solid #252525;
+    color:var(--gold);font-size:20px;font-weight:900;
+    text-align:center;padding:8px 2px;border-radius:10px;
+    font-family:inherit;-moz-appearance:textfield;
+  }
+  .dur-input::-webkit-inner-spin-button,
+  .dur-input::-webkit-outer-spin-button{-webkit-appearance:none}
+  .dur-input:focus{outline:none;border-color:var(--gold);background:#1a1700}
+  .dur-input::placeholder{color:#333;font-size:14px;font-weight:400}
+  .dur-unit{
+    position:absolute;bottom:1px;right:4px;font-size:8px;color:#444;
+    pointer-events:none;font-weight:700;letter-spacing:.5px;
+  }
+
+  .cell-time{
+    grid-column:2/4;
+    display:flex;align-items:center;gap:4px;
+    padding:8px 10px 0;
+    font-variant-numeric:tabular-nums;
+  }
+  .t-from,.t-to{font-size:14px;font-weight:700;color:#aaa}
+  .t-arrow{font-size:11px;color:#444;margin:0 2px}
+
+  .cell-info{
+    grid-column:2/4;
+    display:flex;gap:6px;
+    padding:2px 10px 8px;
+    min-width:0;
+  }
+  .loc-input,.rem-input{
+    flex:1;min-width:0;background:transparent;border:none;
+    border-bottom:1px solid transparent;
+    color:var(--text);font-size:14px;padding:4px 2px;
+    font-family:inherit;transition:border-color .15s;
+  }
+  .loc-input:focus,.rem-input:focus{outline:none;border-bottom-color:var(--gold)}
+  .loc-input::placeholder,.rem-input::placeholder{color:#333}
+  .loc-input:not(:placeholder-shown){color:var(--gold);font-weight:600}
+
+  .desk-del{
+    display:none;position:absolute;right:6px;top:50%;transform:translateY(-50%);
+    z-index:5;background:none;border:none;color:#333;
+    font-size:16px;cursor:pointer;width:28px;height:28px;border-radius:6px;
+    align-items:center;justify-content:center;transition:all .15s;
+  }
+  .desk-del:hover{color:#ff4444;background:rgba(255,68,68,.1)}
+
+  /* ── ADD BTN ── */
+  .add-area{
+    max-width:800px;margin:6px auto 0;padding:0 10px;
+  }
+  .add-btn{
+    width:100%;padding:14px;
+    border:2px dashed #222;border-radius:14px;
+    background:transparent;color:#444;font-size:15px;
+    font-family:inherit;cursor:pointer;transition:all .2s;
+  }
+  .add-btn:hover,.add-btn:active{border-color:var(--gold);color:var(--gold)}
+
+  /* ── BOTTOM BAR ── */
+  .bottombar{
+    position:fixed;bottom:0;left:0;right:0;z-index:200;
+    background:rgba(15,15,15,.94);
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border-top:1px solid var(--border);
+    padding:10px 16px;
+    display:flex;align-items:center;gap:16px;
+  }
+  .stat{display:flex;align-items:baseline;gap:4px}
+  .stat-l{font-size:11px;color:#555}
+  .stat-v{font-size:16px;font-weight:900;color:var(--gold)}
+  .bar-actions{margin-left:auto;display:flex;gap:6px}
+  .b-btn{
+    padding:7px 14px;border:1px solid #333;border-radius:8px;
+    background:#1a1a1a;color:#ccc;font-size:12px;font-family:inherit;
+    cursor:pointer;transition:all .15s;white-space:nowrap;
+    position:relative;
+  }
+  .b-btn:hover{border-color:var(--gold);color:var(--gold)}
+  .b-btn.pri{background:var(--gold);color:#000;border-color:var(--gold);font-weight:700}
+  .b-btn.pri:hover{background:#ffd740}
+
+  /* ── EXPORT MENU (Action Sheet) ── */
+  .menu-overlay{
+    position:fixed;inset:0;z-index:998;
+    background:rgba(0,0,0,.5);
+    opacity:0;pointer-events:none;
+    transition:opacity .2s;
+  }
+  .menu-overlay.show{opacity:1;pointer-events:auto}
+
+  .export-menu{
+    position:fixed;
+    bottom:0;left:0;right:0;z-index:999;
+    background:#1c1c1e;
+    border-radius:16px 16px 0 0;
+    padding:8px 12px 28px;
+    transform:translateY(100%);
+    transition:transform .3s cubic-bezier(.32,.72,0,1);
+  }
+  .export-menu.show{transform:translateY(0)}
+
+  .menu-handle{
+    width:36px;height:4px;background:#555;border-radius:4px;
+    margin:6px auto 14px;
+  }
+  .menu-title{
+    font-size:13px;color:#666;font-weight:600;
+    text-align:center;margin-bottom:10px;
+    letter-spacing:.5px;
+  }
+  .menu-item{
+    display:flex;align-items:center;gap:14px;
+    width:100%;padding:15px 16px;
+    background:#2c2c2e;border:none;border-radius:12px;
+    color:#fff;font-size:16px;font-family:inherit;
+    cursor:pointer;transition:background .15s;
+    margin-bottom:6px;
+  }
+  .menu-item:last-child{margin-bottom:0}
+  .menu-item:hover,.menu-item:active{background:#3a3a3c}
+  .menu-item .mi-icon{font-size:22px;width:32px;text-align:center;flex-shrink:0}
+  .menu-item .mi-text{flex:1;text-align:left}
+  .menu-item .mi-label{font-size:15px;font-weight:600}
+  .menu-item .mi-desc{font-size:11px;color:#888;margin-top:1px}
+  .menu-divider{height:8px}
+  .menu-cancel{
+    display:block;width:100%;padding:15px;
+    background:#2c2c2e;border:none;border-radius:12px;
+    color:var(--gold);font-size:16px;font-weight:700;
+    font-family:inherit;cursor:pointer;text-align:center;
+    transition:background .15s;
+  }
+  .menu-cancel:hover,.menu-cancel:active{background:#3a3a3c}
+
+  /* Desktop: popup instead of action sheet */
+  @media(min-width:700px){
+    .export-menu{
+      position:fixed;
+      bottom:60px;right:16px;left:auto;
+      width:280px;
+      border-radius:16px;
+      padding:8px 10px 10px;
+      transform:translateY(20px);opacity:0;
+      transition:transform .2s ease,opacity .2s ease;
+    }
+    .export-menu.show{transform:translateY(0);opacity:1}
+    .menu-handle{display:none}
+    .menu-overlay.show{background:transparent}
+  }
+
+  /* ── Loading Toast ── */
+  .toast{
+    position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    z-index:1000;
+    background:rgba(30,30,30,.95);
+    border:1px solid #333;
+    border-radius:16px;padding:24px 32px;
+    text-align:center;
+    opacity:0;pointer-events:none;
+    transition:opacity .2s;
+  }
+  .toast.show{opacity:1;pointer-events:auto}
+  .toast-spinner{
+    width:32px;height:32px;border:3px solid #333;border-top-color:var(--gold);
+    border-radius:50%;margin:0 auto 12px;
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .toast-text{color:#aaa;font-size:14px}
+  .toast-done{color:var(--gold);font-size:28px;margin-bottom:8px}
+
+  /* ── Hint ── */
+  .hint{text-align:center;color:#222;font-size:11px;margin:16px 0;padding:0 16px}
+  kbd{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:3px;padding:1px 5px;font-size:10px;color:#555}
+
+  /* ── DESKTOP ── */
+  @media(min-width:700px){
+    .schedule{padding:8px 16px}
+    .row{
+      grid-template-columns:70px 100px 20px 100px 1fr 1fr;
+      grid-template-rows:auto;
+    }
+    .cell-dur{grid-row:auto;grid-column:auto;padding:10px 6px 10px 12px}
+    .dur-wrap{width:56px}
+    .dur-input{font-size:22px;padding:10px 2px}
+    .cell-time{grid-column:auto;display:contents}
+    .cell-time .t-from{text-align:center;padding:10px 4px;font-size:16px}
+    .cell-time .t-arrow{text-align:center;padding:10px 0;font-size:12px}
+    .cell-time .t-to{text-align:center;padding:10px 4px;font-size:16px}
+    .cell-info{grid-column:auto;display:contents}
+    .cell-info .loc-input{padding:10px 8px;font-size:15px;border-bottom:1px solid transparent}
+    .cell-info .rem-input{padding:10px 8px;font-size:15px;border-bottom:1px solid transparent}
+    .row-wrap:hover .desk-del{display:flex}
+    .swipe-bg{display:none!important}
+  }
+
+  /* ── Delete animation ── */
+  .row-wrap.deleting{
+    max-height:0!important;opacity:0;overflow:hidden;border-bottom:none;
+    transition:max-height .3s ease,opacity .2s ease;
+  }
+
+  /* ── CAPTURE AREA (hidden clone styling) ── */
+  #captureArea{
+    max-width:800px;margin:0 auto;
+  }
+
+  /* ── PRINT ── */
+  @media print{
+    body{background:#fff;color:#111;padding-bottom:0}
+    .topbar{background:#fff;border-bottom:2px solid #111;position:relative;backdrop-filter:none}
+    .topbar-title{color:#111}
+    .field-input{background:#fff;border-color:#ccc;color:#111}
+    .field-label{color:#888}
+    #startTime{color:#111;border-color:#111;background:#fff}
+    .row-wrap{border-bottom:1px solid #ddd}
+    .row{background:#fff}
+    .dur-input{color:#111;background:#f5f5f5;border-color:#ddd}
+    .t-from,.t-to{color:#111}
+    .loc-input:not(:placeholder-shown){color:#8a6d00}
+    .loc-input,.rem-input{color:#111}
+    .desk-del,.swipe-bg,.add-area,.bottombar,.hint,.menu-overlay,.export-menu,.toast{display:none!important}
+    .start-group label{color:#666}
+  }
+</style>
+</head>
+<body>
+
+<!-- OVERLAY -->
+<div class="menu-overlay" id="menuOverlay" onclick="closeMenu()"></div>
+
+<!-- EXPORT MENU -->
+<div class="export-menu" id="exportMenu">
+  <div class="menu-handle"></div>
+  <div class="menu-title">匯出時間表</div>
+  <button class="menu-item" onclick="exportImage()">
+    <span class="mi-icon">🖼️</span>
+    <span class="mi-text">
+      <div class="mi-label">儲存圖片</div>
+      <div class="mi-desc">PNG 格式，適合 WhatsApp / IG 傳送</div>
+    </span>
+  </button>
+  <button class="menu-item" onclick="exportPDF()">
+    <span class="mi-icon">📄</span>
+    <span class="mi-text">
+      <div class="mi-label">儲存 PDF</div>
+      <div class="mi-desc">A4 文件，適合列印或 Email</div>
+    </span>
+  </button>
+  <button class="menu-item" onclick="saveJSON()">
+    <span class="mi-icon">💾</span>
+    <span class="mi-text">
+      <div class="mi-label">儲存資料檔</div>
+      <div class="mi-desc">JSON 格式，之後可以載入修改</div>
+    </span>
+  </button>
+  <button class="menu-item" onclick="loadJSON()">
+    <span class="mi-icon">📂</span>
+    <span class="mi-text">
+      <div class="mi-label">載入資料檔</div>
+      <div class="mi-desc">載入之前儲存嘅 JSON 檔案</div>
+    </span>
+  </button>
+  <div class="menu-divider"></div>
+  <button class="menu-cancel" onclick="closeMenu()">取消</button>
+</div>
+
+<!-- LOADING TOAST -->
+<div class="toast" id="toast">
+  <div class="toast-spinner" id="toastSpinner"></div>
+  <div class="toast-done" id="toastDone" style="display:none">✓</div>
+  <div class="toast-text" id="toastText">匯出中⋯</div>
+</div>
+
+<!-- TOP BAR -->
+<div class="topbar" id="topbar">
+  <div class="topbar-header">
+    <div class="topbar-title">🎬 拍攝時間表</div>
+    <div class="start-group">
+      <label>開始</label>
+      <input type="time" id="startTime" value="14:00">
+    </div>
+  </div>
+  <div class="topbar-fields">
+    <div>
+      <div class="field-label">項目名稱</div>
+      <input class="field-input" type="text" id="project" placeholder="例：品牌形象短片">
+    </div>
+    <div>
+      <div class="field-label">客戶</div>
+      <input class="field-input" type="text" id="client" placeholder="例：ABC 公司">
+    </div>
+    <div class="field-full">
+      <div class="field-label">拍攝日期</div>
+      <input class="field-input" type="date" id="shootDate">
+    </div>
+  </div>
+</div>
+
+<!-- SCHEDULE -->
+<div class="schedule" id="schedule"></div>
+
+<div class="add-area">
+  <button class="add-btn" onclick="addRow();focusLast()">＋ 新增</button>
+</div>
+
+<div class="hint">
+  📱 向右滑刪除 &nbsp;｜&nbsp; <kbd>Tab</kbd> 下一格 &nbsp; <kbd>Enter</kbd> 新增行
+</div>
+
+<!-- BOTTOM BAR -->
+<div class="bottombar" id="bottombar">
+  <div class="stat"><span class="stat-l">總共</span><span class="stat-v" id="sTotal">0m</span></div>
+  <div class="stat"><span class="stat-l">結束</span><span class="stat-v" id="sEnd">--:--</span></div>
+  <div class="stat"><span class="stat-l">項目</span><span class="stat-v" id="sCount">0</span></div>
+  <div class="bar-actions">
+    <button class="b-btn pri" onclick="openMenu()">匯出 ▾</button>
+  </div>
+</div>
+
+<script>
+const schedule = document.getElementById('schedule');
+const startInput = document.getElementById('startTime');
+
+// ── Helpers ──
+const m2t = m => {
+  const h = Math.floor(m/60)%24, mn = m%60;
+  return `${String(h).padStart(2,'0')}:${String(mn).padStart(2,'0')}`;
+};
+const startMin = () => {
+  const [h,m] = (startInput.value||'14:00').split(':').map(Number);
+  return h*60+m;
+};
+const fileName = () => {
+  const p = document.getElementById('project').value.trim();
+  const d = document.getElementById('shootDate').value;
+  return `時間表_${p||'draft'}${d?'_'+d:''}`;
+};
+
+// ── Recalc ──
+function recalc(){
+  let cur = startMin(), total = 0;
+  schedule.querySelectorAll('.row-wrap').forEach(w => {
+    const r = w.querySelector('.row');
+    const d = parseInt(r.querySelector('.dur-input').value)||0;
+    r.querySelector('.t-from').textContent = m2t(cur);
+    r.querySelector('.t-to').textContent = m2t(cur+d);
+    cur += d; total += d;
+  });
+  const hh=Math.floor(total/60), mm=total%60;
+  document.getElementById('sTotal').textContent = hh>0?`${hh}h${mm>0?mm+'m':''}`:mm+'m';
+  document.getElementById('sEnd').textContent = m2t(startMin()+total);
+  document.getElementById('sCount').textContent = schedule.querySelectorAll('.row-wrap').length;
+}
+startInput.addEventListener('input', recalc);
+
+// ── Add Row ──
+function addRow(dur='', loc='', rem=''){
+  const wrap = document.createElement('div');
+  wrap.className = 'row-wrap';
+  wrap.innerHTML = `
+    <div class="swipe-bg">🗑 刪除</div>
+    <div class="row">
+      <div class="cell-dur">
+        <div class="dur-wrap">
+          <input class="dur-input" type="number" inputmode="numeric" min="0" step="5" placeholder="0" value="${dur}">
+          <span class="dur-unit">MIN</span>
+        </div>
+      </div>
+      <div class="cell-time">
+        <span class="t-from">--:--</span>
+        <span class="t-arrow">→</span>
+        <span class="t-to">--:--</span>
+      </div>
+      <div class="cell-info">
+        <input class="loc-input" placeholder="📍 地點" value="${loc}">
+        <input class="rem-input" placeholder="✏️ 備註" value="${rem}">
+      </div>
+      <button class="desk-del" onclick="deleteRow(this.closest('.row-wrap'))">✕</button>
+    </div>
+  `;
+  const row = wrap.querySelector('.row');
+  row.querySelector('.dur-input').addEventListener('input', recalc);
+  wrap.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('keydown', e=>{
+      if(e.key==='Enter'){e.preventDefault();addRow();focusLast()}
+    });
+  });
+  setupSwipe(wrap);
+  schedule.appendChild(wrap);
+  recalc();
+  return wrap;
+}
+
+function deleteRow(wrap){
+  const h = wrap.offsetHeight;
+  wrap.style.maxHeight = h+'px';
+  requestAnimationFrame(()=>wrap.classList.add('deleting'));
+  setTimeout(()=>{wrap.remove();recalc()},300);
+}
+
+function focusLast(){
+  const all = schedule.querySelectorAll('.dur-input');
+  if(all.length) all[all.length-1].focus();
+}
+
+// ── Swipe to Delete ──
+function setupSwipe(wrap){
+  const row = wrap.querySelector('.row');
+  let startX=0, startY=0, dx=0, swiping=false, locked=false;
+  const threshold = () => wrap.offsetWidth * 0.35;
+
+  row.addEventListener('touchstart', e=>{
+    if(e.target.closest('input')) return;
+    const t = e.touches[0];
+    startX = t.clientX; startY = t.clientY;
+    dx = 0; swiping = false; locked = false;
+    row.classList.remove('snapping');
+    row.classList.add('dragging');
+  }, {passive:true});
+
+  row.addEventListener('touchmove', e=>{
+    if(locked) return;
+    const t = e.touches[0];
+    const moveX = t.clientX - startX;
+    const moveY = t.clientY - startY;
+    if(!swiping && Math.abs(moveX)<8 && Math.abs(moveY)<8) return;
+    if(!swiping){
+      if(Math.abs(moveY) > Math.abs(moveX)){locked=true;row.classList.remove('dragging');return}
+      swiping = true;
+      wrap.classList.add('swiping');
+    }
+    dx = Math.max(0, moveX);
+    row.style.transform = `translateX(${dx}px)`;
+  }, {passive:true});
+
+  row.addEventListener('touchend', ()=>{
+    row.classList.remove('dragging');
+    row.classList.add('snapping');
+    if(swiping && dx > threshold()){
+      row.style.transform = `translateX(100%)`;
+      setTimeout(()=>deleteRow(wrap),200);
+    } else {
+      row.style.transform = 'translateX(0)';
+      setTimeout(()=>wrap.classList.remove('swiping'),250);
+    }
+    swiping=false;
+  });
+}
+
+// ── Menu ──
+function openMenu(){
+  document.getElementById('menuOverlay').classList.add('show');
+  document.getElementById('exportMenu').classList.add('show');
+}
+function closeMenu(){
+  document.getElementById('menuOverlay').classList.remove('show');
+  document.getElementById('exportMenu').classList.remove('show');
+}
+
+// ── Toast ──
+function showToast(text){
+  const t=document.getElementById('toast');
+  document.getElementById('toastSpinner').style.display='block';
+  document.getElementById('toastDone').style.display='none';
+  document.getElementById('toastText').textContent=text;
+  t.classList.add('show');
+}
+function toastSuccess(text){
+  document.getElementById('toastSpinner').style.display='none';
+  document.getElementById('toastDone').style.display='block';
+  document.getElementById('toastText').textContent=text;
+  setTimeout(()=>document.getElementById('toast').classList.remove('show'),1200);
+}
+function hideToast(){document.getElementById('toast').classList.remove('show')}
+
+// ── Build capture clone ──
+function buildCapture(){
+  // Create a standalone div that represents the schedule for capture
+  const container = document.createElement('div');
+  container.style.cssText = `
+    background:#0f0f0f;color:#ddd;padding:24px;width:800px;
+    font-family:'Noto Sans TC',-apple-system,BlinkMacSystemFont,sans-serif;
+  `;
+
+  // Header
+  const projectVal = document.getElementById('project').value || '未命名項目';
+  const clientVal = document.getElementById('client').value;
+  const dateVal = document.getElementById('shootDate').value;
+  const startVal = startInput.value || '14:00';
+
+  let headerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:14px;border-bottom:2px solid #f5c518;">
+      <div>
+        <div style="font-size:22px;font-weight:900;color:#f5c518;margin-bottom:4px;">🎬 ${projectVal}</div>
+        <div style="font-size:13px;color:#888;">
+          ${clientVal?'客戶：'+clientVal:''}
+          ${clientVal&&dateVal?' &nbsp;│&nbsp; ':''}
+          ${dateVal?'日期：'+dateVal:''}
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:11px;color:#666;margin-bottom:2px;">開始時間</div>
+        <div style="font-size:28px;font-weight:900;color:#f5c518;">${startVal}</div>
+      </div>
+    </div>
+  `;
+
+  // Rows
+  let rowsHTML = '';
+  schedule.querySelectorAll('.row-wrap').forEach(w => {
+    const r = w.querySelector('.row');
+    const dur = r.querySelector('.dur-input').value || '0';
+    const from = r.querySelector('.t-from').textContent;
+    const to = r.querySelector('.t-to').textContent;
+    const loc = r.querySelector('.loc-input').value;
+    const rem = r.querySelector('.rem-input').value;
+
+    rowsHTML += `
+      <div style="display:grid;grid-template-columns:70px 110px 24px 110px 1fr 1fr;align-items:center;padding:12px 0;border-bottom:1px solid #1e1e1e;">
+        <div style="display:flex;align-items:center;justify-content:center;">
+          <div style="background:#1a1a1a;border:2px solid #252525;border-radius:10px;padding:8px 4px;text-align:center;width:54px;">
+            <div style="font-size:22px;font-weight:900;color:#f5c518;line-height:1">${dur}</div>
+            <div style="font-size:8px;color:#444;font-weight:700;letter-spacing:.5px;">MIN</div>
+          </div>
+        </div>
+        <div style="text-align:center;font-size:16px;font-weight:700;color:#aaa;">${from}</div>
+        <div style="text-align:center;font-size:12px;color:#444;">→</div>
+        <div style="text-align:center;font-size:16px;font-weight:700;color:#aaa;">${to}</div>
+        <div style="padding:0 10px;font-size:15px;${loc?'color:#f5c518;font-weight:600':'color:#333'};">${loc||'—'}</div>
+        <div style="padding:0 10px;font-size:15px;color:#ddd;">${rem||''}</div>
+      </div>
+    `;
+  });
+
+  // Footer
+  const totalEl = document.getElementById('sTotal').textContent;
+  const endEl = document.getElementById('sEnd').textContent;
+  const countEl = document.getElementById('sCount').textContent;
+  let footerHTML = `
+    <div style="display:flex;gap:24px;margin-top:16px;padding-top:14px;border-top:2px solid #1e1e1e;">
+      <div><span style="font-size:11px;color:#555;">總共 </span><span style="font-size:18px;font-weight:900;color:#f5c518;">${totalEl}</span></div>
+      <div><span style="font-size:11px;color:#555;">結束 </span><span style="font-size:18px;font-weight:900;color:#f5c518;">${endEl}</span></div>
+      <div><span style="font-size:11px;color:#555;">項目 </span><span style="font-size:18px;font-weight:900;color:#f5c518;">${countEl}</span></div>
+    </div>
+  `;
+
+  container.innerHTML = headerHTML + rowsHTML + footerHTML;
+  return container;
+}
+
+// ── Export Image ──
+async function exportImage(){
+  closeMenu();
+  await new Promise(r=>setTimeout(r,350));
+  showToast('正在生成圖片⋯');
+
+  try{
+    const capture = buildCapture();
+    document.body.appendChild(capture);
+
+    const canvas = await html2canvas(capture, {
+      backgroundColor:'#0f0f0f',
+      scale:2,
+      useCORS:true,
+      logging:false
+    });
+
+    document.body.removeChild(capture);
+
+    canvas.toBlob(blob=>{
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName()+'.png';
+      a.click();
+      URL.revokeObjectURL(url);
+      toastSuccess('圖片已儲存 ✓');
+    },'image/png');
+
+  }catch(err){
+    console.error(err);
+    hideToast();
+    alert('匯出失敗，請再試一次');
+  }
+}
+
+// ── Export PDF ──
+async function exportPDF(){
+  closeMenu();
+  await new Promise(r=>setTimeout(r,350));
+  showToast('正在生成 PDF⋯');
+
+  try{
+    const capture = buildCapture();
+    document.body.appendChild(capture);
+
+    const canvas = await html2canvas(capture, {
+      backgroundColor:'#0f0f0f',
+      scale:2,
+      useCORS:true,
+      logging:false
+    });
+
+    document.body.removeChild(capture);
+
+    const { jsPDF } = window.jspdf;
+    const imgData = canvas.toDataURL('image/png');
+
+    // A4
+    const pdfW = 210;
+    const pdfH = 297;
+    const margin = 10;
+    const contentW = pdfW - margin*2;
+    const contentH = (canvas.height * contentW) / canvas.width;
+
+    const orientation = contentH > pdfH - margin*2 ? 'p' : 'p';
+    const pdf = new jsPDF(orientation, 'mm', 'a4');
+
+    // If content is taller than one page, scale to fit
+    let finalW = contentW;
+    let finalH = contentH;
+    if(finalH > pdfH - margin*2){
+      const scale = (pdfH - margin*2) / finalH;
+      finalW *= scale;
+      finalH *= scale;
+    }
+
+    const x = (pdfW - finalW)/2;
+    const y = margin;
+
+    pdf.setFillColor(15,15,15);
+    pdf.rect(0,0,pdfW,pdfH,'F');
+
+    pdf.addImage(imgData,'PNG', x, y, finalW, finalH);
+    pdf.save(fileName()+'.pdf');
+
+    toastSuccess('PDF 已儲存 ✓');
+
+  }catch(err){
+    console.error(err);
+    hideToast();
+    alert('匯出失敗，請再試一次');
+  }
+}
+
+// ── Save / Load JSON ──
+function saveJSON(){
+  closeMenu();
+  const rows=[];
+  schedule.querySelectorAll('.row-wrap').forEach(w=>{
+    const r=w.querySelector('.row');
+    rows.push({
+      d:r.querySelector('.dur-input').value,
+      l:r.querySelector('.loc-input').value,
+      r:r.querySelector('.rem-input').value
+    });
+  });
+  const data={
+    p:document.getElementById('project').value,
+    c:document.getElementById('client').value,
+    dt:document.getElementById('shootDate').value,
+    st:startInput.value,
+    rows
+  };
+  const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=fileName()+'.json';
+  a.click();
+}
+
+function loadJSON(){
+  closeMenu();
+  const input=document.createElement('input');
+  input.type='file';input.accept='.json';
+  input.onchange=e=>{
+    const f=e.target.files[0];if(!f)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const d=JSON.parse(ev.target.result);
+        document.getElementById('project').value=d.p||'';
+        document.getElementById('client').value=d.c||'';
+        document.getElementById('shootDate').value=d.dt||'';
+        startInput.value=d.st||'14:00';
+        schedule.innerHTML='';
+        (d.rows||[]).forEach(r=>addRow(r.d,r.l,r.r));
+      }catch{alert('檔案錯誤')}
+    };
+    reader.readAsText(f);
+  };
+  input.click();
+}
+
+// ── Demo ──
+addRow('180','荔枝角華盛工業中心9樓A','化妝');
+addRow('30','','車程去土瓜灣');
+addRow('60','土瓜灣 鋪頭','拍攝');
+addRow('15','','換衫');
+addRow('30','','車程去港澳碼頭');
+addRow('90','港澳碼頭電車站','拍攝');
+</script>
+
+</body>
+</html>
